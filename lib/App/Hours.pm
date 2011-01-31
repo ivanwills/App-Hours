@@ -1,13 +1,12 @@
 package App::Hours;
 
-# Created on: 2011-01-19 14:46:07
+# Created on: 2011-01-20 09:48:38
 # Create by:  Ivan Wills
 # $Id$
 # $Revision$, $HeadURL$, $Date$
 # $Revision$, $Source$, $Date$
 
-use strict;
-use warnings;
+use Moose;
 use version;
 use Carp;
 use Scalar::Util;
@@ -15,23 +14,25 @@ use List::Util;
 #use List::MoreUtils;
 use Data::Dumper qw/Dumper/;
 use English qw/ -no_match_vars /;
-use base qw/Exporter/;
+use Path::Class;
 
 our $VERSION     = version->new('0.0.1');
 our @EXPORT_OK   = qw//;
 our %EXPORT_TAGS = ();
 #our @EXPORT      = qw//;
 
-sub new {
-	my $caller = shift;
-	my $class  = ref $caller ? ref $caller : $caller;
-	my %param  = @_;
-	my $self   = \%param;
 
-	bless $self, $class;
+sub _week_of_year {
+    my $now   = $option{day} ? Class::Date->new($option{day}) : now();
+    my $week  = int $now->yday / 7;
 
-	return $self;
+    if ( $now->yday < 6 && $now->wday - 2 > $now->yday ) {
+        $now -= ( $now->yday + 2 ) . 'D';
+        $week = int $now->yday / 7;
+    }
+    return sprintf "%s %02i\n", $now->year, $week;
 }
+
 
 1;
 
@@ -77,15 +78,6 @@ form "An object of this class represents ...") to give the reader a high-level
 context to help them understand the methods that are subsequently described.
 
 
-=head3 C<new ( $search, )>
-
-Param: C<$search> - type (detail) - description
-
-Return: App::Hours -
-
-Description:
-
-=cut
 
 
 =head1 DIAGNOSTICS
