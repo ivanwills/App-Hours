@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 
 # Created on: 2010-08-30 09:02:49
-# Create by:  dev
+# Create by:  Ivan Wills
 # $Id$
 # $Revision$, $HeadURL$, $Date$
 # $Revision$, $Source$, $Date$
@@ -10,10 +10,9 @@ use strict;
 use warnings;
 use version;
 use Scalar::Util;
-use List::Util qw/sum/;
+use List::Util qw/sum max/;
 use List::MoreUtils qw/zip/;
-#use Getopt::Long;
-use GetOpt::Alt qw/get_options/;
+use Getopt::Alt qw/get_options/;
 use Pod::Usage;
 use Data::Dumper qw/Dumper/;
 use English qw/ -no_match_vars /;
@@ -22,20 +21,34 @@ use Path::Class;
 use Text::CSV_XS;
 use Class::Date qw/now/;
 use Term::ANSIColor;
-use YAML::Syck;
 
-our $VERSION  = version->new('0.0.1');
-my ($name)    = $PROGRAM_NAME =~ m{^.*/(.*?)$}mxs;
-my $file_base = $ENV{HOME} . "/.$name";
+our $VERSION = version->new('0.0.1');
+my ($name)   = $PROGRAM_NAME =~ m{^.*/(.*?)$}mxs;
+my $file     = file( $ENV{HOME} . "/.$name" );
 
+use constant {
+    HOUR   => 60 * 60,
+    MINUTE => 60,
+};
 my %option = (
-    history     => 5,
-    work_day    => 8 * 60 * 60,
-    lunch_break => 30 * 60,
+    fmt         => '%10day %6start %3lunch %6end %12avg %10total',
+    work_day    => 8,
+    lunch_break => 30,
+    bin         => 15,
     verbose     => 0,
     man         => 0,
     help        => 0,
     VERSION     => 0,
+);
+my %labels = (
+    stddev => [ 'Standard Deviation', 'StdDev' ],
+    avg    => [ 'Average to Date', 'Avg to Date', 'Avg' ],
+    day    => [ qw/Date / ],
+    total  => [ 'Day Length', 'Total' ],
+    days   => [ qw/Days / ],
+    lunch  => [ qw/Lunch  Lch / ],
+    end    => [ qw/Finish End / ],
+    start  => [ qw/Start / ],
 );
 
 main();
@@ -43,9 +56,6 @@ exit 0;
 
 sub main {
 
-    #Getopt::Long::Configure('bundling');
-    #GetOptions(
-    #    \%option,
     my $opt = get_options(
         {
             default => \%option,
@@ -54,41 +64,43 @@ sub main {
         },
         [
             'history|h=i',
-            'all|a+',
+            'more|m+',
             'now|n=s',
             'between|b=s',
             'full|f',
+            'percent|p=f',
+            'work_day|work-day|w=f',
+            'lunch_bread|l=f',
             'round|r=i',
+            'bin|i=i',
+            'fmt|format|M=s',
             'verbose|v+',
-            'day|d=s',
         ]
     ) or pod2usage(2);
-    %option = %{ $opt->opt };
+    %option = %{ $opt };
+    $option{work_day} *= HOUR;
+    $option{lunch_break} ||= 0;
+    $option{lunch_break} *= MINUTE;
 
-    if ( !-d $file_base ) {
-        mkdir $file_base;
+    # increase the number of days shown
+    if ( $option{more} ) {
+        $option{between}
+            = $option{more} == 1 ? now() - '1M'
+            : $option{more} == 2 ? now()->clone(month => 1, day => 1)
+            :                     now() - "$option{more}Y";
+        $option{between} = $option{between}->ymd;
     }
 
-    # small all set the history to 20 days
-    if ( $option{all} ) {
-        if ( $option{all} == 1 ) {
-            $option{history} = 20;
-            $option{all}     = 0;
-        }
-        elsif ( $option{all} == 2 ) {
-            $option{history} = 365;
-            $option{all}     = 0;
-        }
-    }
+    $option{more} = 1 if $option{between};
+    $option{history} ||= 5 if !$option{more};
 
-    $option{all} = 1 if $option{between};
     my $action = shift @ARGV || '';
 
     my $tmp
         = $action eq 'add'   ? add()
         : $action eq 'stats' ? stats()
-        : $action eq 'week'  ? week_of_year()
-        :                      list();
+        : $action eq 'list'  ? list()
+        :                      stats();
 
     return $tmp;
 }
@@ -105,39 +117,26 @@ sub add {
         $date = $fields->[0];
     }
 
-    my $file = file( $file_base . '/' . week_of_year() );
     my $now = $option{now} ? Class::Date->new( $option{now} ) || Class::Date->new( now()->strftime('%Y-%m-%d ') . $option{now} ) : now();
-    my $fh = $file->openw;
-
+    open my $fh, '>', $file or die "Could not open $file for reading: $OS_ERROR\n";
     for my $i ( 0 .. @rewrite - 2 ) {
         $csv->combine(@{ $rewrite[$i] });
-        #print {$fh} $csv->string . "\n";
+        print {$fh} $csv->string . "\n";
     }
 
     if ($date eq $now->strftime('%Y-%m-%d')) {
         $csv->combine(@{ $rewrite[-1] }, $now->strftime('%H:%M'));
-        #print {$fh} $csv->string . "\n";
+        print {$fh} $csv->string . "\n";
     }
     else {
         $csv->combine(@{ $rewrite[-1] });
-        #print {$fh} $csv->string . "\n";
+        print {$fh} $csv->string . "\n";
         $csv->combine($now->strftime('%Y-%m-%d'), $now->strftime('%H:%M'));
-        #print {$fh} $csv->string . "\n";
+        print {$fh} $csv->string . "\n";
     }
     close $fh;
 
     return;
-}
-
-sub week_of_year {
-    my $now   = $option{day} ? Class::Date->new($option{day}) : now();
-    my $week  = int $now->yday / 7;
-
-    if ( $now->yday < 6 && $now->wday - 2 > $now->yday ) {
-        $now -= ( $now->yday + 2 ) . 'D';
-        $week = int $now->yday / 7;
-    }
-    return sprintf "%s %02i\n", $now->year, $week;
 }
 
 sub list {
@@ -176,7 +175,7 @@ sub list {
 
     RECORD:
     while ( my ( $row, $line_no ) = get_fields() ) {
-        next RECORD if !$option{all} && $line_no + $option{history} - 1 < $lines;
+        next RECORD if !$option{more} && $line_no + $option{history} - 1 < $lines;
 
         my @fields = @$row;
         my $date = shift @fields;
@@ -204,32 +203,32 @@ sub list {
 
         if ( $option{verbose} ) {
             my $day = Class::Date->new($date);
-            if ( $previous && ( $option{all} || $option{history} > 5 ) && ($day - $previous)->day > 1 ) {
+            if ( $previous && ( $option{more} || $option{history} > 5 ) && ($day - $previous)->day > 1 ) {
                 print "\n";
             }
 
             my $avg = $grand / $count;
-            my $Hour = $total / 60 / 60;
+            my $Hour = $total / HOUR;
             my $colour
                 = $Hour >= 8.5 ? 'green'
                 : $Hour <  7   ? 'red'
                 : $Hour <  7.8 ? 'yellow'
                 :                '';
             $colour
-                .= $total < $avg - 5 * 60 ? ' underline'
-                :  $total > $avg + 5 * 60 ? ' bold'
+                .= $total < $avg - 5 * MINUTE ? ' underline'
+                :  $total > $avg + 5 * MINUTE ? ' bold'
                 :                            '';
             my ($hour, $min, $sec) = time_parts($total);
             print "$date";
 
             if ( $option{verbose} > 1 ) {
                 if ( @fields == 4 || @fields == 3 ) {
-                    my $mins = sprintf "%3d", int ( (round(Class::Date->new("$date $fields[2]"), 1) - round(Class::Date->new("$date $fields[1]")) ) / 60 );
+                    my $mins = sprintf "%3d", int ( (round(Class::Date->new("$date $fields[2]"), 1) - round(Class::Date->new("$date $fields[1]")) ) / MINUTE );
                     $fields[3] ||= now()->strftime('%H:%M');
                     print "\t$fields[0]  $mins $fields[-1] ";
                 }
                 elsif ( @fields == 2 ) {
-                    my $mins = sprintf "%3d", int ( (round(now(), 1) - round(Class::Date->new("$date $fields[1]"))) / 60 );
+                    my $mins = sprintf "%3d", int ( (round(now(), 1) - round(Class::Date->new("$date $fields[1]"))) / MINUTE );
                     print "\t$fields[0]  $mins       ";
                 }
                 else {
@@ -261,7 +260,7 @@ sub list {
         my $spare =  $one_day * int $avg / $option{work_day};
         my $left = $one_day - ( $avg - $spare );
         my $hour_8pm = $now->clone;
-        $hour_8pm += (20 - $hour_8pm->hour) * 60 * 60;
+        $hour_8pm += (20 - $hour_8pm->hour) * HOUR;
 
         if ( $left > 0 && $now + $left < $hour_8pm ) {
             $left += $option{lunch_break} if $now->hour < 13;
@@ -330,61 +329,183 @@ sub round {
 sub stats {
     my $stats = raw_stats( $option{history} );
     my $last;
-    #warn Dumper $stats->[-1];
-    #$stats->[-1]{start} = "7:00";
-    #$stats->[-1]{total} = 3 * 60 * 60;
-    #warn Dumper $stats->[-1];
 
-    print "Date        Start Lch  Finish Avg to Date Day Length\n";
+    print colored( sprinthead(), 'bold' ), "\n";
+    my $days = 0;
     for my $day ( @{ $stats } ) {
         print "\n" if $last && $day->{day} > $last->{day} + '1D';
+        $days += $day->{days};
 
-        my $hour = $day->{total} / 60 / 60;
+        my $hour = $day->{total} / HOUR;
+        my $work_day = $day->{days} == 1 ? $option{work_day} : $option{work_day} / 2;
         my $colour
-            = $hour >= 8.5 ? 'green'
-            : $hour <  7   ? 'red'
-            : $hour <  7.8 ? 'yellow'
-            :                '';
+            = $hour >= $work_day * 8.5 / 8 / HOUR ? 'green'
+            : $hour <  $work_day * 7 / 8   / HOUR ? 'red'
+            : $hour <  $work_day * 7.8 / 8 / HOUR ? 'yellow'
+            :                                               '';
         $colour
             .= $day->{total} < $day->{avg} - $day->{stddev} ? ' underline'
             :  $day->{total} > $day->{avg} + $day->{stddev} ? ' bold'
             :                                                 '';
-        printf "%s %6s %3s  %6s %11s", $day->{day}->ymd('-'), $day->{start}, $day->{lunch}, $day->{end} || '', time_str($day->{avg});
-        print '      ', colored( time_str($day->{total}), $colour ), "\n";
+        print sprintday( $option{fmt}, { total => $colour }, %$day ), "\n";
 
         $last = $day;
     }
 
+    my $days_worked = $last->{half_days} ? $days - $last->{half_days} * 0.5 . " days and $last->{half_days} half days" : "$days days";
     print "\n";
-    print "Average      : " . time_str( $last->{avg}, 1 ) . " (for " . (scalar @$stats) . " days)\n";
-    print "Std Deviation: " . time_str($last->{stddev}, 1) . "\n";
+    print "Average      : " . time_str( $last->{avg}, 'sec' ) . " (for $days_worked)\n";
+    print "Std Deviation: " . time_str($last->{stddev}, 'sec') . "\n";
 
-    my $lunch = !$last->{lunch} ? $option{lunch_break} : 0;
+    # determine if lunch break is still expected
+    my $lunch = !$last->{lunch} || $last->{lunch} eq 'N/A' ? $option{lunch_break} : 0;
 
+    # check if the last day in the stats represents today
     if ( ! $last->{end} || $last->{end} eq now()->strftime('%H:%M') ) {
+        my %leave;
+
+        # workout if work today is less that nominal workday
         my $total = $last->{total} - $lunch;
         if ( $total < $option{work_day} ) {
-            print "For 8 hour day\n";
-            print "Leave at:      " . ( ( now() - $total + $option{work_day} )->meridiam ) . "\n";
-            print "               " . time_str( ( $option{work_day} ) - $total, 1 ) . "\n";
+            my $day = sprintf "%.1f", $option{work_day} / HOUR;
+            $day =~ s/[.]0$//xms;
+            my $leave = now() - $total + $option{work_day};
+            $leave{ $leave->epoch }
+                = "For $day hour day\n"
+                . "Leave at:      " . ( $leave->meridiam ) . "\n"
+                . "               " . time_str( ( $option{work_day} ) - $total, 'sec' ) . "\n";
+        }
+
+        # determine if still need to work to maintain average day length
+        if ( @{$stats} >= 2 ) {
+            if ( $stats->[-2]{avg} > $last->{total} + $lunch ) {
+                my $till = $stats->[-2]{avg} - $last->{total} + $lunch;
+                my $leave = now() + $till;
+                $leave{ $leave->epoch }
+                    = "For average day\n"
+                    . "Leave at:      " . $leave->meridiam . "\n"
+                    . "               " . time_str( $till, 'sec' ) . "\n";
+            }
+            else {
+                print "For average day leave now\n";
+            }
+        }
+
+        # Check if need to make up hours to get average matching work day length
+        if ( $last->{avg} < $option{work_day} ) {
+            my $till = ( $option{work_day} - $last->{avg} ) * $days + $lunch;
+            my $leave = now() + $till;
+            $leave{ $leave->epoch }
+                = "For minimum day to average at workday length\n"
+                . "Leave at:      " . $leave->meridiam . "\n"
+                . "               " . time_str( $till, 'sec' ) . "\n";
+        }
+
+        print "\n";
+        for my $leave ( sort keys %leave ) {
+            print $leave{$leave};
         }
     }
 
-    my $days  = $last->{avg} / $option{work_day};
-    my $hours = $last->{avg} % $option{work_day};
-    if ( 0 < $days && $days < 1 ) {
-        my $till = $stats->[-2]{avg} - $last->{total} + $lunch;
-        #for my $avg ( 8, 8.1, 8.2, 8.3, 8.4, 8.5 ) {
-        #    warn "$avg\n";
-        #my $till = ( $avg - 3 + 0.5 ) * 60 * 60;
-        print "For average day\n";
-        print "Leave at:      " . (now() + $till)->meridiam . "\n";
-        print "               " . time_str( $till, 1 ) . "\n";
-        #}
+    # determine if you have worked overtime
+    $days  = ( $last->{avg} - $option{work_day} ) * $days / $option{work_day};
+    if ( $days < -1 || $days > 1 || $option{verbose} ) {
+        my ($time, $colour) = $days < 0 ? ( 'undertime', 'red' ) : ('overtime', 'green' );
+        print colored( "You have " . time_str(abs $days * $option{work_day}, $option{verbose}) ."in $time\n", $colour );
     }
-    else {
-        print "For average day leave now\n";
+
+    # show binned stats of day lengths
+    if ( $option{verbose} > 1 ) {
+        my %bin;
+        for my $stat (@{ $stats }) {
+            $bin{ time_trunc( $stat->{total}, $option{bin} ) }++;
+        }
+        my $max = max values %bin;
+        print "\nTime  : Num days worked for that long\n";
+        for my $key ( sort { $a <=> $b } keys %bin ) {
+            my $colour
+                = $key >= $option{work_day} * 8.5 / 8 ? 'green'
+                : $key <  $option{work_day} * 7.0 / 8 ? 'red'
+                : $key <  $option{work_day} * 7.8 / 8 ? 'yellow'
+                :                                              '';
+            printf "%s : %3i %s\n", time_str($key), $bin{$key}, colored( '*' x (($bin{$key} / $max) * 50), $colour );
+        }
     }
+    if ( $option{percent} || $option{verbose} > 3 ) {
+        $option{percent} ||= $last->{stddev} / $option{work_day} * 100;
+        for my $day ( @{ $stats } ) {
+            time_collector($day->{day}, $day->{total} / HOUR);
+        }
+    }
+    time_display() if $option{percent};
+}
+
+sub sprinthead {
+    my @parts = split /%(\d*\w+)/, $option{fmt};
+    my $fmt   = shift @parts;
+    my $out   = '';
+    my $data  = 1;
+
+    while ( my $part = shift @parts ) {
+        if ( $data ) {
+            my ($size, $type) = $part =~ /^(\d*)(.*)$/xms;
+            my $label;
+            for my $type_label ( @{ $labels{$type} } ) {
+                if ( $size && $size >= length $type_label ) {
+                    $label = $type_label;
+                    last;
+                }
+            }
+            $label ||= $labels{$type}[-1];
+            if ( $size && $size < length $label ) {
+                $size = length $label;
+            }
+            $size ||= '';
+            $out .= sprintf "%${size}s", $label;
+            $fmt .= "%$size$type";
+        }
+        else {
+            $out .= $part;
+            $fmt .= $part;
+        }
+        $data = !$data;
+    }
+
+    $option{fmt} = $fmt;
+    return $out;
+}
+
+sub sprintday {
+    my ($fmt, $meta, %day) = @_;
+    $meta ||= {};
+    $day{day}    = $day{day}->ymd('-');
+    $day{end}  ||= '';
+    $day{avg}    = time_str($day{avg});
+    $day{total}  = time_str($day{total});
+    $day{stddev} = time_str($day{stddev});
+
+    my @args;
+    $fmt =~ s/%(\d*)(\w+)/sprintday_part( $1, $meta->{$2}, $day{$2}, $2 )/egxms;
+
+    return $fmt;
+}
+
+sub sprintday_part {
+    my ( $size, $colour, $value, $type ) = @_;
+    my $out = '';
+
+    if ($size) {
+        $out .= ' ' x ( $size - length $value );
+    }
+    if ( $type eq 'lunch' && !$value ) {
+        $out .= ' ';
+    }
+
+    $out
+        .= $colour ? colored( $value, $colour )
+        :            $value || '';
+
+    return $out;
 }
 
 sub raw_stats {
@@ -392,15 +513,20 @@ sub raw_stats {
     my @stats;
     my ($lines) = get_records();
 
+    $option{between} ||= '';
+    $option{between} =~ s{/}{-}g;
     my ($start, $end) = split /:/, $option{between} || '', 2;
-    $start = $start ? Class::Date->new($start) : undef;
-    $end   = $end   ? Class::Date->new($end)   : undef;
+    $start = $start ? Class::Date->new($start) || die "Bad start date" : undef;
+    $end   = $end   ? Class::Date->new($end)   || die "Bad end date"   : undef;
+    my $today = Class::Date->new( now->strftime('%Y-%m-%d') );
+    my $days = 0;
+    my $half_days = 0;
 
     my $now    = now();
 
     RECORD:
     while ( my ( $row, $line_no ) = get_fields() ) {
-        next RECORD if !$option{all} && $line_no + $option{history} - 1 < $lines;
+        next RECORD if ( !$option{more} && !$option{between} ) && $line_no + $option{history} - 1 < $lines;
 
         my @fields = @$row;
         my $date = shift @fields;
@@ -409,38 +535,53 @@ sub raw_stats {
         next RECORD if $end   && $day > $end;
 
         my $total = Class::Date::Rel->new(0);
+        my $last;
+        my $lunch = 0;
 
         for ( my $i = 0; $i < @fields; $i += 2 ) {
             last RECORD if $option{full} && !$fields[$i + 1];
             my $start = round( Class::Date->new("$date " . $fields[$i]), 0 );
-            my $end = round( defined $fields[$i + 1] ? Class::Date->new("$date " . $fields[$i + 1]) : $now, 1 );
+            my $end;
+            if ( defined $fields[$i + 1] ) {
+                $end = round(Class::Date->new("$date " . $fields[$i + 1]), 1 );
+            }
+            else {
+                $end = round($now, 1 );
+                $fields[$i + 1] = $now->hms;
+            }
             $fields[$i  ] = $start->strftime('%H:%M');
             $fields[$i+1] = $end->strftime('%H:%M');
 
             $total += $end - $start;
+            if ( $last ) {
+                $lunch += int ( ( round(Class::Date->new($start), 1) - round(Class::Date->new($last)) ) / MINUTE );
+            }
+            $last = $end;
         }
 
-        my $lunch
-            = @fields == 4 || @fields == 3 ? int ( (round(Class::Date->new("$date $fields[2]"), 1) - round(Class::Date->new("$date $fields[1]")) ) / 60 )
-            : @fields == 2                 ? int ( (round(now(), 1) - round(Class::Date->new("$date $fields[1]"))) / 60 )
-            :                                undef;
+        $lunch ||= 'N/A';
 
         push @stats, {
             day   => $day,
             total => $total,
             start => $fields[0],
-            end   => $fields[3],
+            end   => $fields[-1],
             lunch => $lunch,
         };
 
         # TODO improve these calculations so that they don't make things too slow
-        my $avg    = ( sum map { $_->{total} } @stats ) / @stats;
+        $days += $stats[-1]{days}   = @fields <= 2 && $day != $today ? 0.5 : 1;
+        $half_days++ if @fields <= 2 && $day != $today;
+
+        my $avg    = ( sum map { $_->{total} } @stats ) / $days;
         my $stddev = sum map { ( $_->{total} - $avg ) ** 2 } @stats;
-        $stats[-1]{stddev} = sqrt $stddev / @stats;
-        $stats[-1]{avg}    = $avg;
+
+        $stats[-1]{stddev}    = sqrt $stddev / $days;
+        $stats[-1]{avg}       = $avg;
+        $stats[-1]{half_days} = $half_days;
     }
 
-    if ( $records && $records < @stats && $option{all} < 2 ) {
+    if ( $records && $records < @stats && $option{more} < 2 ) {
         @stats = @stats[ -$records .. -1 ];
     }
 
@@ -449,21 +590,113 @@ sub raw_stats {
 
 sub time_parts {
     my ($time) = @_;
-    my $hour = int $time / 60 / 60;
-    my $min  = int $time / 60;
-    my $sec  = int $time - $min * 60;
-    $min -= $hour * 60;
-    $hour = "0$hour" if $hour < 10;
-    $min  = "0$min"  if $min  < 10;
-    $sec  = "0$sec"  if $sec  < 10;
-    return ($hour, $min, $sec);
+    my $day      = int $time / $option{work_day};
+    my $hour     = int $time / HOUR;
+    my $day_hour = $hour - $day * $option{work_day} / HOUR;
+    my $min      = int $time / MINUTE;
+    my $sec      = int $time - $min * MINUTE;
+    $min -= $hour * MINUTE;
+    $hour = "0$hour"     if $hour < 10;
+    $min  = "0$min"      if $min  < 10;
+    $sec  = "0$sec"      if $sec  < 10;
+    return ($hour, $min, $sec, $day, $day_hour);
 }
 
 sub time_str {
-    my ($time, $show_sec) = @_;
-    my ($hour, $min, $sec) = time_parts($time);
+    my ($time, $show) = @_;
 
-    return $show_sec ? "$hour\:$min\:$sec" : "$hour\:$min";
+    my ($hour, $min, $sec, $day, $day_hour) = time_parts($time);
+
+    if ( @_ == 2 && (!$show || $show ne 'sec') ) {
+        my $out = '';
+        $out .= sprintf "%i day%s "   , $day     , $day      == 1 ? '' : 's';
+        return $out if !$option{verbose};
+        $out .= sprintf "%i hour%s "  , $day_hour, $day_hour == 1 ? '' : 's';
+        return $out if $option{verbose} == 1;
+        $out .= sprintf "%i minute%s ", $min     , $min      == 1 ? '' : 's';
+        return $out if $option{verbose} == 2;
+        $out .= sprintf "%i second%s ", $sec     , $sec      == 1 ? '' : 's';
+        return $out;
+    }
+
+    return $show && $show eq 'sec' ? "$hour\:$min\:$sec" : "$hour\:$min";
+}
+
+sub time_trunc {
+    my ( $time, $min ) = @_;
+
+    my ($h, $m, $s) = time_parts($time);
+
+    $m -= $m % $min;
+
+    return $h * 60 * 60 + $m * 60;
+}
+
+{
+    my $month_days = 20;
+    my $week_days  = 5;
+    my @month;
+    my @week ;
+    my @short_month;
+    my @short_week;
+    my @long_month;
+    my @long_week;
+    BEGIN {
+        $month_days = 20;
+        $week_days  = 5;
+    };
+
+    sub time_collector {
+        my ($date, $time) = @_;
+        my $full  = 0;
+        my $count = 0;
+
+        push @week, [ $date, $time ];
+        if ( @week > $week_days ) {
+            shift @week;
+            my $hours = sprintf "%.1f", sum map { $_->[1] } @week;
+            if ( $hours < $option{work_day} / HOUR * $week_days * ( 1 - $option{percent} / 100 ) ) {
+                push @short_week, [ $week[0][0]->ymd, $hours ];
+            }
+            elsif ( $hours > $option{work_day} / HOUR * $week_days * ( 1 + $option{percent} / 100 ) ) {
+                push @long_week, [ $week[0][0]->ymd, $hours ];
+            }
+        }
+        push @month, [ $date, $time ];
+        if ( @month > $month_days ) {
+            shift @month;
+            my $hours = sprintf "%.1f", sum map { $_->[1] } @month;
+            if ( $hours < $option{work_day} / HOUR * $month_days * ( 1 - $option{percent} / 100 ) ) {
+                push @short_month, [ $month[0][0]->ymd, $hours ];
+            }
+            elsif ( $hours > $option{work_day} / HOUR * $month_days * ( 1 + $option{percent} / 100 ) ) {
+                push @long_month, [ $month[0][0]->ymd, $hours ];
+            }
+        }
+
+        return;
+    }
+
+    sub time_display {
+        if (@long_week) {
+            print 'Long week' . ( @long_week > 1 ? 's = ' . @long_week : '' ) . ' (> ' . sprintf("%.1f", ( $option{work_day} / HOUR * $week_days * ( 1 + $option{percent} / 100 ) ) ) . " hours)\n";
+            print colored( (join "\n", map { "$_->[0] => $_->[1]" } @long_week), 'green' ), "\n" if $option{verbose} > 4;
+        }
+        if (@long_month) {
+            print 'Long month' . ( @long_month > 1 ? 's = ' . @long_month : '' ) . ' (> ' . sprintf("%.1f", ( $option{work_day} / HOUR * $month_days * ( 1 + $option{percent} / 100 ) ) ) . " hours)\n";
+            print colored( (join "\n", map { "$_->[0] => $_->[1]" } @long_month), 'green' ), "\n" if $option{verbose} > 4;
+        }
+        if (@short_week) {
+            print 'Short week' . ( @short_week > 1 ? 's = ' . @short_week : '' ) . ' (< ' . sprintf("%.1f", ( $option{work_day} / HOUR * $week_days * ( 1 - $option{percent} / 100 ) ) ) . " hours)\n";
+            print colored( (join "\n", map { "$_->[0] => $_->[1]" } @short_week), 'red' ), "\n" if $option{verbose} > 4;
+        }
+        if (@short_month) {
+            print 'Short month' . ( @short_month > 1 ? 's = ' . @short_month : '' ) . ' (< ' . sprintf("%.1f", ( $option{work_day} / HOUR * $month_days * ( 1 - $option{percent} / 100 ) ) ) . " hours)\n";
+            print colored( (join "\n", map { "$_->[0] => $_->[1]" } @short_month), 'red' ), "\n" if $option{verbose} > 4;
+        }
+
+        return;
+    }
 }
 
 {
@@ -486,7 +719,6 @@ sub time_str {
     }
 
     sub get_records {
-        my $file = file( $file_base . '/' . week_of_year() );
         return `wc -l $file` =~ /(\d+)/xms;
     }
 
@@ -510,26 +742,83 @@ This documentation refers to hours version 0.1.
 
 =head1 SYNOPSIS
 
-   hours list [--history=... | --all [--all] || ]
+   hours [--history=... | --more* | --between=... ]
+   hours stats ...
    hours add [--now=...]
 
  OPTIONS:
-  -h --history=int Count of the number days in to the past to go to
-  -a --all         Show the last month if specified once if specified twice shows all dates
-  -n --now=date    Use this date if
-  -f --full        When listing only count full days/completed days
-  -b --between=[date1][:date2]
-                   Show hours worked between the dates specified
-                   if no second date specified shows dates after that date
-                   if no first date (ie :date) show only entries before that date
-  -r --round=int   Round to int minutes for start and finish times
+  -h --history[=]int
+                 Count of the number days in to the past to go to
+  -m --more      A simple way of showing more days, if specified:
+                    once show the last month
+                    twice this year
+                    more  that many years
+  -n --now[=]date
+                 Use this date if
+  -f --full      When listing only count full days/completed days
+  -b --between[=][date1][:date2]
+                 Show hours worked between the dates specified
+                 if no second date specified shows dates after that date
+                 if no first date (ie :date) show only entries before that date
+  -r --round[=]int
+                 Round to int minutes for start and finish times
+  -m --format[=]str
+                 Sets the format for displaying the data, see --man for details
+                 (Default '%10day %6start %3lunch %6end %12avg %10total')
+  -i --bin[=]int When very verbose is used the number of days works for a
+                 particular length of time is shown, this option sets the
+                 grouping size of hours worked in minutes (Default is 15 minutes)
+  -p --percent[=]int
+                 Turns on showing weeks/months that are more than this
+                 percentage away from expected amount. Note a week is defined
+                 as a 5 days of work in a row and a month is 20 days in a row.
 
-  -v --verbose     Show more detailed option
-     --version     Prints the version information
-     --help        Prints this help information
-     --man         Prints the full documentation for hours
+  -v --verbose   Show more detailed option
+     --VERSION   Prints the version information
+     --help      Prints this help information
+     --man       Prints the full documentation for hours
 
 =head1 DESCRIPTION
+
+=head2 Format
+
+=head3 Fields
+
+=over 4
+
+=item day
+
+The work day the record is about
+
+=item lunch
+
+The length of time spent at lunch
+
+=item start
+
+The time at which you started work
+
+=item end
+
+The time at which you left work
+
+=item avg
+
+The rolling average for the displayed period
+
+=item total
+
+The total hours worked
+
+=item days
+
+Weather the day is a full day (1) or a half day (0.5)
+
+=item stddev
+
+The standard deviation
+
+=back
 
 =head1 SUBROUTINES/METHODS
 
