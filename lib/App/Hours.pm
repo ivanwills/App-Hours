@@ -23,7 +23,8 @@ our %EXPORT_TAGS = ();
 
 
 sub _week_of_year {
-    my $now   = $option{day} ? Class::Date->new($option{day}) : now();
+    my ($self) = @_;
+    my $now   = $self->{day} ? Class::Date->new($self->{day}) : now();
     my $week  = int $now->yday / 7;
 
     if ( $now->yday < 6 && $now->wday - 2 > $now->yday ) {

@@ -52,5 +52,5 @@ TODO: {
 
 }
 
-module_boilerplate_ok('lib/App-Hours/t/boilerplate.t.pm');
+module_boilerplate_ok('lib/App/Hours.pm');
 
