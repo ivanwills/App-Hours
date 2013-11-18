@@ -70,7 +70,7 @@ sub main {
             'full|f',
             'percent|p=f',
             'work_day|work-day|w=f',
-            'lunch_bread|l=f',
+            'lunch_break|lunch-break|l=f',
             'round|r=i',
             'bin|i=i',
             'fmt|format|M=s',
@@ -753,6 +753,10 @@ This documentation refers to hours version 0.1.
                     once show the last month
                     twice this year
                     more  that many years
+  -w --work-day[=]num
+                 Specify work day length in hours (Default 8.0)
+  -l --lunch-break[=]num
+                 Specify default lunch brealunch break length in minutes (Default 30)
   -n --now[=]date
                  Use this date if
   -f --full      When listing only count full days/completed days
@@ -762,7 +766,7 @@ This documentation refers to hours version 0.1.
                  if no first date (ie :date) show only entries before that date
   -r --round[=]int
                  Round to int minutes for start and finish times
-  -m --format[=]str
+  -M --format[=]str
                  Sets the format for displaying the data, see --man for details
                  (Default '%10day %6start %3lunch %6end %12avg %10total')
   -i --bin[=]int When very verbose is used the number of days works for a
