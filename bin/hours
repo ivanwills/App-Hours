@@ -427,8 +427,9 @@ sub stats {
                 = $key >= $option{work_day} * 8.5 / 8 ? 'green'
                 : $key <  $option{work_day} * 7.0 / 8 ? 'red'
                 : $key <  $option{work_day} * 7.8 / 8 ? 'yellow'
-                :                                              '';
-            printf "%s : %3i %s\n", time_str($key), $bin{$key}, colored( '*' x (($bin{$key} / $max) * 50), $colour );
+                :                                       '';
+
+            printf "%s : %3i %s\n", time_str($key), $bin{$key}, colored( '*' x (($bin{$key} / $max) * 50), $colour || 'white' );
         }
     }
     if ( $option{percent} || $option{verbose} > 3 ) {
