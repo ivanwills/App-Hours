@@ -25,7 +25,7 @@ use Text::ANSITable;
 
 our $VERSION = version->new('0.0.1');
 my ($name)   = $PROGRAM_NAME =~ m{^.*/(.*?)$}mxs;
-my $file     = file( $ENV{HOME} . "/.$name" );
+my $file;
 
 use constant {
     HOUR   => 60 * 60,
@@ -36,6 +36,7 @@ my %option = (
     work_day    => 8,
     lunch_break => 30,
     bin         => 15,
+    file        => "$ENV{HOME}/.$name",
     verbose     => 0,
     man         => 0,
     help        => 0,
@@ -75,6 +76,7 @@ sub main {
             'round|r=i',
             'bin|i=i',
             'fmt|format|M=s',
+            'file|F=s',
             'verbose|v+',
             'utf8|u!',
         ]
@@ -96,6 +98,7 @@ sub main {
     $option{more} = 1 if $option{between};
     $option{history} ||= 5 if !$option{more};
 
+    $file = file($option{file});
     my $action = shift @ARGV || '';
 
     my $tmp
@@ -755,6 +758,10 @@ This documentation refers to hours version 0.1.
                  Turns on showing weeks/months that are more than this
                  percentage away from expected amount. Note a week is defined
                  as a 5 days of work in a row and a month is 20 days in a row.
+  -F --file[=]file
+                 The file that the config is stored in (Default ~/.hours)
+  -u --utf8      Assume UTF8 capable terminal
+     --no-utf8   Don't assume a UTF8 capable terminal
 
   -v --verbose   Show more detailed option
      --VERSION   Prints the version information
