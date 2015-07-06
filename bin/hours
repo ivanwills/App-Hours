@@ -17,7 +17,7 @@ use Pod::Usage;
 use Data::Dumper qw/Dumper/;
 use English qw/ -no_match_vars /;
 use FindBin qw/$Bin/;
-use Path::Class;
+use Path::Tiny;
 use Text::CSV_XS;
 use Class::Date qw/now/;
 use Term::ANSIColor;
@@ -98,7 +98,7 @@ sub main {
     $option{more} = 1 if $option{between};
     $option{history} ||= 5 if !$option{more};
 
-    $file = file($option{file});
+    $file = path($option{file});
     my $action = shift @ARGV || '';
 
     my $tmp

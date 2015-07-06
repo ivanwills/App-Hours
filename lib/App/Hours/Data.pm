@@ -14,7 +14,6 @@ use List::Util;
 #use List::MoreUtils;
 use Data::Dumper qw/Dumper/;
 use English qw/ -no_match_vars /;
-use Path::Class;
 
 our $VERSION     = version->new('0.0.1');
 our @EXPORT_OK   = qw//;
