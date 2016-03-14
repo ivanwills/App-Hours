@@ -30,5 +30,6 @@ add_stopwords(qw/
     Hornsby
     avg
     stddev
+    col
 /);
 all_pod_files_spelling_ok();
