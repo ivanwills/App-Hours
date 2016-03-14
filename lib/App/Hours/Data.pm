@@ -20,8 +20,6 @@ our @EXPORT_OK   = qw//;
 our %EXPORT_TAGS = ();
 #our @EXPORT      = qw//;
 
-have
-
 1;
 
 __END__
