@@ -2,8 +2,8 @@
 
 use strict;
 use warnings;
-use Test::More tests => 3 + 1;
-use Test::NoWarnings;
+use Test::More;
+use Test::Warnings;
 
 sub not_in_file_ok {
     my ($filename, %regex) = @_;
@@ -51,4 +51,10 @@ not_in_file_ok(Changes =>
 
 }
 
+module_boilerplate_ok('bin/hours');
 module_boilerplate_ok('lib/App/Hours.pm');
+module_boilerplate_ok('lib/App/Hours/Cmd/Add.pm');
+module_boilerplate_ok('lib/App/Hours/Cmd/Stats.pm');
+module_boilerplate_ok('lib/App/Hours/Data.pm');
+module_boilerplate_ok('lib/Text/ANSITable/StyleSet/Hours.pm');
+done_testing();
