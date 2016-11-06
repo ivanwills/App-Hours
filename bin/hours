@@ -637,22 +637,30 @@ sub time_trunc {
         if ( @week > $week_days ) {
             shift @week;
             my $hours = sprintf "%.1f", sum map { $_->[1] } @week;
-            if ( $hours < $option{work_day} / HOUR * $week_days * ( 1 - $option{percent} / 100 ) ) {
-                push @short_week, [ $week[0][0]->ymd, $hours ];
+            if ( $hours < $option{work_day} / HOUR * $week_days * ( 1 - $option{percent} / 100 )
+                && ( !$short_week[0] || $week[0][0] > $short_week[-1][0] + $week_days * 24 * 3600 )
+            ) {
+                push @short_week, [ $week[0][0], $hours ];
             }
-            elsif ( $hours > $option{work_day} / HOUR * $week_days * ( 1 + $option{percent} / 100 ) ) {
-                push @long_week, [ $week[0][0]->ymd, $hours ];
+            elsif ( $hours > $option{work_day} / HOUR * $week_days * ( 1 + $option{percent} / 100 )
+                && ( !$long_week[0] || $week[0][0] > $long_week[-1][0] + $week_days * 24 * 3600 )
+            ) {
+                push @long_week, [ $week[0][0], $hours ];
             }
         }
         push @month, [ $date, $time ];
         if ( @month > $month_days ) {
             shift @month;
             my $hours = sprintf "%.1f", sum map { $_->[1] } @month;
-            if ( $hours < $option{work_day} / HOUR * $month_days * ( 1 - $option{percent} / 100 ) ) {
-                push @short_month, [ $month[0][0]->ymd, $hours ];
+            if ( $hours < $option{work_day} / HOUR * $month_days * ( 1 - $option{percent} / 100 )
+                && ( !$short_month[0] || $month[0][0] > $short_month[-1][0] + $month_days * 24 * 3600 )
+            ) {
+                push @short_month, [ $month[0][0], $hours ];
             }
-            elsif ( $hours > $option{work_day} / HOUR * $month_days * ( 1 + $option{percent} / 100 ) ) {
-                push @long_month, [ $month[0][0]->ymd, $hours ];
+            elsif ( $hours > $option{work_day} / HOUR * $month_days * ( 1 + $option{percent} / 100 )
+                && ( !$long_month[0] || $month[0][0] > $long_month[-1][0] + $month_days * 24 * 3600 )
+            ) {
+                push @long_month, [ $month[0][0], $hours ];
             }
         }
 
@@ -664,25 +672,25 @@ sub time_trunc {
             print 'Long week' . ( @long_week > 1 ? 's = ' . @long_week : '' )
                 . ' (> ' . sprintf("%.1f", $option{work_day} / HOUR * $week_days * ( 1 + $option{percent} / 100 ) )
                 . 'hours, std = ' . sprintf("%.1f", $option{work_day} / HOUR * $week_days ) . ")\n";
-            print colored( (join "\n", map { "$_->[0] => $_->[1]" } @long_week), 'green' ), "\n" if $option{verbose} > 4;
+            print colored( (join "\n", map { $_->[0]->ymd . " => $_->[1]" } @long_week), 'green' ), "\n" if $option{verbose} > 4;
         }
         if (@long_month) {
             print 'Long month' . ( @long_month > 1 ? 's = ' . @long_month : '' )
                 . ' (> ' . sprintf("%.1f", $option{work_day} / HOUR * $month_days * ( 1 + $option{percent} / 100 ) )
                 . 'hours, std = ' . sprintf("%.1f", $option{work_day} / HOUR * $month_days ) . " hours)\n";
-            print colored( (join "\n", map { "$_->[0] => $_->[1]" } @long_month), 'green' ), "\n" if $option{verbose} > 4;
+            print colored( (join "\n", map { $_->[0]->ymd . " => $_->[1]" } @long_month), 'green' ), "\n" if $option{verbose} > 4;
         }
         if (@short_week) {
             print 'Short week' . ( @short_week > 1 ? 's = ' . @short_week : '' )
                 . ' (< ' . sprintf("%.1f", $option{work_day} / HOUR * $week_days * ( 1 - $option{percent} / 100 ) )
                 . 'hours, std = ' . sprintf("%.1f", $option{work_day} / HOUR * $week_days ) . " hours)\n";
-            print colored( (join "\n", map { "$_->[0] => $_->[1]" } @short_week), 'red' ), "\n" if $option{verbose} > 4;
+            print colored( (join "\n", map { $_->[0]->ymd . " => $_->[1]" } @short_week), 'red' ), "\n" if $option{verbose} > 4;
         }
         if (@short_month) {
             print 'Short month' . ( @short_month > 1 ? 's = ' . @short_month : '' )
                 . ' (< ' . sprintf("%.1f", $option{work_day} / HOUR * $month_days * ( 1 - $option{percent} / 100 ) )
                 . ' hours, std = ' . sprintf("%.1f", $option{work_day} / HOUR * $month_days ) . " hours)\n";
-            print colored( (join "\n", map { "$_->[0] => $_->[1]" } @short_month), 'red' ), "\n" if $option{verbose} > 4;
+            print colored( (join "\n", map { $_->[0]->ymd . " => $_->[1]" } @short_month), 'red' ), "\n" if $option{verbose} > 4;
         }
 
         return;
