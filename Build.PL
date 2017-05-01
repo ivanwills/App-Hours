@@ -10,6 +10,7 @@ my $builder = Module::Build->new(
     requires          => {
         'perl'                 => '5.010',
         'Class::Date'          => '1.1.15',
+        'Data::Unixish::Apply' => 0,
         'Getopt::Alt'          => '0.2.3',
         'List::MoreUtils'      => '0.33',
         'Moo'                  => '1.006001',
