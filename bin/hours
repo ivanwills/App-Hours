@@ -35,6 +35,7 @@ my %option = (
     fmt         => '%10day %6start %3lunch %6end %12avg %10total',
     work_day    => 8,
     lunch_break => 30,
+    percent     => 20,
     bin         => 15,
     file        => "$ENV{HOME}/.$name",
     verbose     => 0,
