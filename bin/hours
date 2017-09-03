@@ -9,6 +9,7 @@
 use strict;
 use warnings;
 use version;
+use Carp qw/carp croak cluck confess longmess/;
 use Scalar::Util;
 use List::Util qw/sum max/;
 use List::MoreUtils qw/zip/;
@@ -336,6 +337,8 @@ sub stats {
     my $stats = raw_stats( $option{history} );
     my $last;
 
+    confess "No history to process!\n" if ! @$stats;
+
     my $t = Text::ANSITable->new;
     $t->use_utf8($option{utf8}) if defined $option{utf8};
     $t->border_style($t->use_utf8 ? 'Default::double' : 'Default::single_ascii');
@@ -466,12 +469,13 @@ sub sprinthead {
 
 sub sprintday {
     my ($fmt, $meta, %day) = @_;
+
     $meta ||= {};
     $day{day}    = $day{day}->ymd('-');
     $day{end}  ||= '';
     $day{avg}    = time_str($day{avg});
-    $day{total}  = time_str($day{total});
-    $day{stddev} = time_str($day{stddev});
+    $day{total}  = time_str($day{total} || 0);
+    $day{stddev} = time_str($day{stddev} || 0);
 
     my @args;
     my @parts = split /\s*%\d*/, $option{fmt};
@@ -573,6 +577,7 @@ sub raw_stats {
 
 sub time_parts {
     my ($time) = @_;
+    confess "No time passed!\n" if !defined $time || $time eq '';
     my $day      = int $time / $option{work_day};
     my $hour     = int $time / HOUR;
     my $day_hour = $hour - $day * $option{work_day} / HOUR;
@@ -588,6 +593,7 @@ sub time_parts {
 sub time_str {
     my ($time, $show) = @_;
 
+    confess "No time passed!\n" if !defined $time || $time eq '';
     my ($hour, $min, $sec, $day, $day_hour) = time_parts($time);
 
     if ( @_ == 2 && (!$show || $show ne 'sec') ) {
