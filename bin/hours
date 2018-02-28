@@ -614,9 +614,11 @@ sub time_str {
 sub time_trunc {
     my ( $time, $min ) = @_;
 
+    confess "Bad minute '$min'" if $min ne $min * 1;
+
     my ($h, $m, $s) = time_parts($time);
 
-    $m -= $m % $min;
+    $m -= (1 * $m) % $min;
 
     return $h * 60 * 60 + $m * 60;
 }
