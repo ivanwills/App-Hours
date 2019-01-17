@@ -394,7 +394,7 @@ sub stats {
             $leave{ $leave->epoch }
                 = "For $day hour day\n"
                 . "Leave at:      " . ( $leave->meridiam ) . "\n"
-                . "               " . time_str( ( $option{work_day} ) - $total, 'sec' ) . "\n";
+                . "      in:      " . time_str( ( $option{work_day} ) - $total, 'sec' ) . "\n";
         }
 
         # determine if still need to work to maintain average day length
@@ -405,7 +405,7 @@ sub stats {
                 $leave{ $leave->epoch }
                     = "For average day\n"
                     . "Leave at:      " . $leave->meridiam . "\n"
-                    . "               " . time_str( $till, 'sec' ) . "\n";
+                    . "      in:      " . time_str( $till, 'sec' ) . "\n";
             }
             else {
                 print "For average day leave now\n";
@@ -419,7 +419,7 @@ sub stats {
             $leave{ $leave->epoch }
                 = "For minimum day to average at workday length\n"
                 . "Leave at:      " . $leave->meridiam . "\n"
-                . "               " . time_str( $till, 'sec' ) . "\n";
+                . "      in:      " . time_str( $till, 'sec' ) . "\n";
         }
 
         print "\n";
