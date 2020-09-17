@@ -107,6 +107,9 @@ sub main {
             @{ $option{stats} }
         };
     }
+    else {
+        $option{stats} = {};
+    }
 
     $option{more} = 1 if $option{between};
     $option{history} ||= 5 if !$option{more};
