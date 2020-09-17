@@ -40,7 +40,7 @@ my %option = (
     percent     => 20,
     bin         => 15,
     file        => "$ENV{HOME}/.$name",
-    stats       => {},
+    stats       => [],
     verbose     => 0,
     man         => 0,
     help        => 0,
@@ -81,7 +81,7 @@ sub main {
             'bin|i=i',
             'fmt|format|M=s',
             'file|F=s',
-            'stats|s=s%',
+            'stats|s=s@',
             'verbose|v+',
             'utf8|u!',
         ]
@@ -98,6 +98,14 @@ sub main {
             : $option{more} == 2 ? now()->clone(month => 1, day => 1)
             :                     now() - "$option{more}Y";
         $option{between} = $option{between}->ymd;
+    }
+
+    if (@{ $option{stats} }) {
+        $option{stats} = {
+            map { $_ => 1 }
+            map { split /,/, $_ }
+            @{ $option{stats} }
+        };
     }
 
     $option{more} = 1 if $option{between};
@@ -376,14 +384,14 @@ sub stats {
         $t->add_row([sprintday($option{fmt}, { total => $colour }, %$day )]);
 
         if (($day->{day} - $week_stats->[-1]{start}) / DAY > 7) {
-            push @{ $week_stats }, { start => $day->{day} - (($stats->[0]{day}->wday - 1) . 'D23H'), hours => 0 };
+            push @{ $week_stats }, { start => $day->{day} - (($day->{day}->wday - 1) . 'D23H'), hours => 0 };
         }
         $week_stats->[-1]{hours} += $day->{total} / HOUR;
         $week_stats->[-1]{days}++;
         push @{ $week_stats->[-1]{dow} }, $day->{day}->ymd;
 
         if ($day->{day}->mon != $month_stats->[-1]{start}->mon) {
-            push @{ $month_stats }, { start => $day->{day} - (($stats->[0]{day}->mday - 1) . 'D23H'), hours => 0 };
+            push @{ $month_stats }, { start => $day->{day} - (($day->{day}->mday - 1) . 'D23H'), hours => 0 };
         }
         $month_stats->[-1]{hours} += $day->{total} / HOUR;
         $month_stats->[-1]{days}++;
