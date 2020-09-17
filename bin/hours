@@ -728,25 +728,30 @@ sub time_trunc {
     }
 
     sub time_display {
+        my $shown = 0;
         if (@long_week) {
+            print "\n" if !$shown++;
             print 'Long week' . ( @long_week > 1 ? 's = ' . @long_week : '' )
                 . ' (> ' . sprintf("%.1f", $option{work_day} / HOUR * $week_days * ( 1 + $option{percent} / 100 ) )
                 . 'hours, std = ' . sprintf("%.1f", $option{work_day} / HOUR * $week_days ) . ")\n";
             print colored( (join "\n", map { $_->[0]->ymd . " => $_->[1]" } @long_week), 'green' ), "\n" if $option{verbose} > 4;
         }
         if (@long_month) {
+            print "\n" if !$shown++;
             print 'Long month' . ( @long_month > 1 ? 's = ' . @long_month : '' )
                 . ' (> ' . sprintf("%.1f", $option{work_day} / HOUR * $month_days * ( 1 + $option{percent} / 100 ) )
                 . 'hours, std = ' . sprintf("%.1f", $option{work_day} / HOUR * $month_days ) . " hours)\n";
             print colored( (join "\n", map { $_->[0]->ymd . " => $_->[1]" } @long_month), 'green' ), "\n" if $option{verbose} > 4;
         }
         if (@short_week) {
+            print "\n" if !$shown++;
             print 'Short week' . ( @short_week > 1 ? 's = ' . @short_week : '' )
                 . ' (< ' . sprintf("%.1f", $option{work_day} / HOUR * $week_days * ( 1 - $option{percent} / 100 ) )
                 . 'hours, std = ' . sprintf("%.1f", $option{work_day} / HOUR * $week_days ) . " hours)\n";
             print colored( (join "\n", map { $_->[0]->ymd . " => $_->[1]" } @short_week), 'red' ), "\n" if $option{verbose} > 4;
         }
         if (@short_month) {
+            print "\n" if !$shown++;
             print 'Short month' . ( @short_month > 1 ? 's = ' . @short_month : '' )
                 . ' (< ' . sprintf("%.1f", $option{work_day} / HOUR * $month_days * ( 1 - $option{percent} / 100 ) )
                 . ' hours, std = ' . sprintf("%.1f", $option{work_day} / HOUR * $month_days ) . " hours)\n";
