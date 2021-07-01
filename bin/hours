@@ -773,6 +773,8 @@ sub time_trunc {
             return;
         }
 
+        return get_fields() if $fields->[0] =~ /^#/;
+
         return wantarray ? ( $fields, $fh->input_line_number ) : $fields;
     }
 
