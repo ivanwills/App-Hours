@@ -74,6 +74,7 @@ sub main {
             'now|n=s',
             'between|b=s',
             'full|f',
+            'gaps|g',
             'percent|p=f',
             'work_day|work-day|w=f',
             'lunch_break|lunch-break|l=f',
@@ -355,7 +356,7 @@ sub stats {
 
     my $t = Text::ANSITable->new;
     $t->use_utf8($option{utf8}) if defined $option{utf8};
-    $t->border_style($t->use_utf8 ? 'Default::double' : 'Default::single_ascii');
+    $t->border_style($t->use_utf8 ? 'Default::double' : 'UTF8::SingleLineBold');
     $t->columns([ sprinthead() ]);
     $t->apply_style_set(
         'Hours',
@@ -384,6 +385,14 @@ sub stats {
             .= $day->{total} < $day->{avg} - $day->{stddev} ? ' underline'
             :  $day->{total} > $day->{avg} + $day->{stddev} ? ' bold'
             :                                                 '';
+
+        if ($last && $option{gaps}) {
+            my $last_plus_1 = $last->{day} + '1D';
+            if ( $day->{day} != $last_plus_1 ) {
+                $t->add_row([sprintday($option{fmt}, { total => $colour }, day => $last_plus_1, avg => 0, total => 0, stddev => 0) ]);
+            }
+        }
+
         $t->add_row([sprintday($option{fmt}, { total => $colour }, %$day )]);
 
         if (($day->{day} - $week_stats->[-1]{start}) / DAY > 7) {
@@ -825,6 +834,7 @@ This documentation refers to hours version 0.1.
   -n --now[=]date
                  Use this date if
   -f --full      When listing only count full days/completed days
+  -g --gaps      Add gaps for missing days (make work day gaps easier to see)
   -b --between[=][date1][:date2]
                  Show hours worked between the dates specified
                  if no second date specified shows dates after that date
