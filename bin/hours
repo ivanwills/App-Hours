@@ -389,7 +389,8 @@ sub stats {
         if ($last && $option{gaps}) {
             my $last_plus_1 = $last->{day} + '1D';
             if ( $day->{day} != $last_plus_1 ) {
-                $t->add_row([sprintday($option{fmt}, { total => $colour }, day => $last_plus_1, avg => 0, total => 0, stddev => 0) ]);
+                my $avg = colored(0, 'black');
+                $t->add_row([sprintday($option{fmt}, { total => 'black' }, day => $avg, avg => \$avg, total => 0, stddev => 0) ]);
             }
         }
 
@@ -531,9 +532,9 @@ sub sprintday {
     my ($fmt, $meta, %day) = @_;
 
     $meta ||= {};
-    $day{day}    = $day{day}->ymd('-');
+    $day{day}    = !ref $day{day} ? $day{day} : $day{day}->ymd('-');
     $day{end}  ||= '';
-    $day{avg}    = time_str($day{avg});
+    $day{avg}    = ref $day{avg} ? ${$day{avg}} : time_str($day{avg});
     $day{total}  = time_str($day{total} || 0);
     $day{stddev} = time_str($day{stddev} || 0);
 
@@ -542,7 +543,7 @@ sub sprintday {
     shift @parts;
     return (
         map {
-            colored( $day{$_}, $meta->{$_} || 'white' )
+            colored( $day{$_} || '', $meta->{$_} || 'white' )
         }
         @parts
     );
