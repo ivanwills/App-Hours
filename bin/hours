@@ -591,12 +591,14 @@ sub stats {
 
     if ( $option{stats}{months} ) {
         print "\nMonths:\n";
-        print "Month      Hours Days Effective\n";
-        print "                        Days\n";
+        print "Month       Hours   Actual  Effective  Difference\n";
+        print "            Worked  Days    Days\n";
         print map {
-            sprintf "%s %5.1f    %d %6.1f\n", $_->{start}->ymd, $_->{hours},
+            sprintf "%s  %6.1f %7d %10.1f %10.1f\n", $_->{start}->ymd,
+              $_->{hours},
               $_->{days},
-              $_->{hours} / ( $option{work_day} / HOUR )
+              $_->{hours} / ( $option{work_day} / HOUR ),
+              $_->{hours} / ( $option{work_day} / HOUR ) - $_->{days},
         } @$month_stats;
         print @$month_stats
           . " month"
