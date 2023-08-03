@@ -70,6 +70,7 @@ sub main {
         },
         [
             'history|h=i',                 'more|m+',
+            'after|A=s',                   'before|B=s',
             'now|n=s',                     'between|b=s',
             'full|f',                      'gaps|g',
             'percent|p=f',                 'work_day|work-day|w=f',
@@ -91,6 +92,11 @@ sub main {
           : $option{more} == 2 ? now()->clone( month => 1, day => 1 )
           :                      now() - "$option{more}Y";
         $option{between} = $option{between}->ymd;
+    }
+
+    if ( $option{before} || $option{after} ) {
+        $option{between} =
+          ( $option{after} || '' ) . $option{before} ? ":$option{before}" : '';
     }
 
     if ( @{ $option{stats} } ) {
@@ -1017,10 +1023,14 @@ This documentation refers to hours version 0.1.
                  Use this date if
   -f --full      When listing only count full days/completed days
   -g --gaps      Add gaps for missing days (make work day gaps easier to see)
-  -b --between[=][date1][:date2]
+  -b --between[=][after_date1][:before_date2]
                  Show hours worked between the dates specified
                  if no second date specified shows dates after that date
                  if no first date (ie :date) show only entries before that date
+  --A --after[=]date
+                 Short cut for --betwee=date
+  --B --before[=]date
+                 Short cut for --betwee=:date
   -r --round[=]int
                  Round to int minutes for start and finish times
   -M --format[=]str
