@@ -842,11 +842,24 @@ sub time_trunc {
         if ( @month > $month_days ) {
             shift @month;
             my $hours = sprintf "%.1f", sum map { $_->[1] } @month;
-            if (
-                $hours < $option{work_day} /
+            my $short_month_hours = $option{work_day} /
                 HOUR *
                 $month_days *
-                ( 1 - $option{percent} / 100 )
+                ( 1 - $option{percent} / 100 );
+            my $long_month_hours = $option{work_day} /
+                HOUR *
+                $month_days *
+                ( 1 + $option{percent} / 100 );
+            #warn Dumper {
+            #    date => "$date",
+            #    hours => $hours,
+            #    short => \@short_month,
+            #    long => [ map {["$_[0]", $_[1]]} @long_month ],
+            #    short_month => $short_month_hours,
+            #    long_month => $long_month_hours,
+            #} if @long_month || @short_month;
+            if (
+                $hours < $short_month_hours
                 && (  !$short_month[0]
                     || $month[0][0] >
                     $short_month[-1][0] + $month_days * 24 * 3600 )
@@ -855,15 +868,13 @@ sub time_trunc {
                 push @short_month, [ $month[0][0], $hours ];
             }
             elsif (
-                $hours > $option{work_day} /
-                HOUR *
-                $month_days *
-                ( 1 + $option{percent} / 100 )
+                $hours > $long_month_hours
                 && (  !$long_month[0]
                     || $month[0][0] >
                     $long_month[-1][0] + $month_days * 24 * 3600 )
               )
             {
+                #warn Dumper ["$month[0][0]", $hours];
                 push @long_month, [ $month[0][0], $hours ];
             }
         }
